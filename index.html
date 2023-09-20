@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+  <h1 id="a">Text Search</h1>
+  <label for="editable-div">ENTER YOUR TEXT:</label>
+  <div id="editable-div" contenteditable="true" aria-placeholder="Enter the paragraph"></div>
+  <div id="suggestions">
+        </div><br><br>
+  <label for="text">ENTER A WORD:</label>
+  <input type="text" placeholder="Enter a Search word" id="text">
+  <br><br><br>
+  <button type="button" id="prev" onclick="prev()">PREVIOUS</button>
+  <button type="button" onclick="highlightWord()">SEARCH</button>
+  <button type="reset" id="reset" value="submit" onclick="clearContent()">RESET</button>
+<style>
+    #prev
+    {
+        margin-left: 350px;
+        margin-right: 40px;
+    height: 60px;
+    border-radius: 10px;   
+    }
+    h1{
+        
+        margin-left: 600px;
+        margin-bottom: 150px;
+    }
+    label{
+    margin-top: 200px;
+    position:static;
+    font-style: bold;
+    border-bottom: 200px;
+    }
+    #enter
+    {
+    margin-left: 300px;
+    }
+    #word
+    {
+    margin-top: 150px;
+    position:static;
+    font-style: bold;
+    margin-left: 300px;
+    }
+    input
+    {
+    height: 50px;
+    width: 200px;
+    margin-left: 180px;
+    font-style: italic;
+    font-family: 'Courier New', Courier, monospace;
+    background-color:aliceblue;
+    }
+    button
+    {
+    margin-left: 210px;
+    width: 90px;
+    height: 60px;
+    border-radius: 10px;
+    }
+    #editable-div {
+    border: 1px solid #ccc;
+    padding: 10px;
+    min-height: 100px;
+    position: relative;
+}
+#suggestions {
+    position: absolute;
+    top: 250px;
+left:0;
+    display: none;
+    background-color: white;
+    border: 1px solid #ccc;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1;
+}
+
+.suggestion-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.suggestion-list li {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.suggestion-list li:hover {
+    background-color: #f0f0f0;
+}
+.marked-word {
+    background-color: #ffcccf;
+    cursor: pointer;
+    text-decoration: underline red;
+}
+    #reset
+    {
+    margin-left: 20px;
+    width: 90px;
+    height: 60px;
+    border-radius: 10px;
+    }
+    .highlight 
+    {
+    background-color:darksalmon
+    }
+    body
+    {
+    background-image: url(images.jpeg);
+    background-size: cover;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    }
+</style>
+<script>
+const editableDiv = document.getElementById('editable-div');
+const suggestionsDiv = document.getElementById('suggestions');
+let typingTimer; 
+const typingDelay = 500;
+editableDiv.addEventListener('input', async () => {
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(async () => {
+        const text = editableDiv.innerText;
+        const apiKey = '4JODS6AGpZ8BSr7G';
+        const apiUrl = `https://api.textgears.com/spelling?key=${apiKey}&text=${encodeURIComponent(text)}`;
+
+        try {
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+
+            if (data.status && data.response && Array.isArray(data.response.errors)) {
+                // Clear previous suggestions
+                suggestionsDiv.innerHTML = '';
+
+                // Process misspelled words and suggestions
+                const errors = data.response.errors;
+                errors.forEach((error,index) => {
+                    const { bad, better } = error;
+                    const suggestionList = document.createElement('ul');
+                    suggestionList.classList.add('suggestion-list');
+
+                    better.forEach(suggestion => {
+                        const suggestionItem = document.createElement('li');
+                        suggestionItem.innerText = suggestion;
+                        suggestionItem.addEventListener('click', () => replaceWord(bad, suggestion));
+                        suggestionList.appendChild(suggestionItem);
+                    });
+
+                    const suggestionContainer = document.createElement('div');
+                    suggestionContainer.classList.add('suggestion-container');
+                    suggestionContainer.setAttribute('data-index', index);
+                    suggestionContainer.appendChild(suggestionList);
+
+                    const markedWord = `<span class="marked-word">${bad}</span>`;
+                    editableDiv.innerHTML = text.replace(new RegExp(bad, 'g'), markedWord);
+
+                    suggestionsDiv.appendChild(suggestionContainer);
+                });
+
+                // Display suggestions dropdown
+                suggestionsDiv.style.display = 'block';
+            } else {
+                // Handle unexpected API response
+                handleUnexpectedApiResponse();
+            }
+        } catch (error) {
+            console.error('Error fetching suggestions:', error);
+        }
+    }, typingDelay);
+});    
+editableDiv.addEventListener('click', (event) => {
+    const clickedWord = event.target;
+    
+    // Check if the clicked element has the "marked-word" class
+    if (clickedWord.classList.contains('marked-word')) {
+        const suggestionsContainer = clickedWord.nextElementSibling;
+        if (suggestionsContainer) {
+            // Find the index of the clicked marked word
+            const markedWordElements = document.querySelectorAll('.marked-word');
+            const index = Array.from(markedWordElements).indexOf(clickedWord);
+
+            // Update the position of the suggestions container to appear below the clicked word
+            const rect = clickedWord.getBoundingClientRect();
+            suggestionsContainer.style.position = 'absolute';
+            suggestionsContainer.style.bottom = '-35px'; // Adjust this value if needed
+            suggestionsContainer.style.left = rect.left + 'px';
+            suggestionsContainer.style.display = 'block';
+
+            // Hide other suggestion containers
+            markedWordElements.forEach((element, i) => {
+                if (i !== index) {
+                    element.nextElementSibling.style.display = 'none';
+                }
+            });
+        }
+    }
+});
+function replaceWord(oldWord, newWord) {
+    const markedWordElements = document.querySelectorAll('.marked-word');
+    if (markedWordElements.length > 0) {
+        markedWordElements.forEach(element => {
+            if (element.innerText === oldWord) {
+                element.innerText = newWord;
+                element.classList.remove('marked-word');
+                suggestionsDiv.style.display = 'none';
+                
+            }
+        });
+    }
+    const range = document.createRange();
+    const sel = window.getSelection();
+    const nextMarkedWord = markedWordElements[0];
+    if (nextMarkedWord) {
+        range.setStartAfter(nextMarkedWord);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+}
+const clickedSuggestionContainer = markedWordElements[i].nextElementSibling;
+    if (clickedSuggestionContainer) {
+        clickedSuggestionContainer.style.display = 'none';
+    }
+}
+function handleUnexpectedApiResponse() {
+    console.error('Unexpected API response:', data);
+    // Clear suggestions and hide the suggestions dropdown
+    suggestionsDiv.innerHTML = '';
+    suggestionsDiv.style.display = 'none';
+}
+
+   let i=0;
+   function highlightWord() {
+
+    const text = document.getElementById("editable-div");
+      const Word = document.getElementById("text").value;
+      const content = text.textContent;
+      const regex = new RegExp(Word, "gi");
+      const indices = [];
+      let highlightedContent = "";
+      let prevIndex = 0 ;
+      let match;
+      while ((match = regex.exec(text.textContent)) !== null) {        
+        indices.push(match.index);
+        }
+      if(i>=indices.length){
+        alert("no words founds"); 
+        i--;
+        
+    }
+      const startIndex = indices[i];
+      const endIndex = startIndex + Word.length;
+      highlightedContent += content.substring(prevIndex, startIndex) +
+      `<span class="highlight">${content.substring(startIndex, endIndex)}</span>`+ content.substring(endIndex);
+        i=i+1;  
+     text.innerHTML=highlightedContent;
+    }
+
+    function prev()
+    {
+        --i;
+        if(i<=0){
+            alert("no words founds");
+            i++;
+            return;
+        }    
+     const text = document.getElementById("editable-div");
+      const Word = document.getElementById("text").value;
+      const content = text.textContent;
+      const regex = new RegExp(Word, "gi");
+      const indices = [];
+      let highlightedContent = "";
+      let prevIndex = 0 ;
+      let match;
+      while ((match = regex.exec(text.textContent)) !== null) {        
+        indices.push(match.index);
+        }
+        (--i);
+        const startIndex = indices[i];
+      const endIndex = startIndex + Word.length;
+      highlightedContent += content.substring(prevIndex, startIndex) +
+      `<span class="highlight">${content.substring(startIndex, endIndex)}</span>`+ content.substring(endIndex);
+         
+     text.innerHTML=highlightedContent;
+     ++i;
+    }    
+    function clearContent()
+    {
+    const text = document.getElementById("editable-div");
+    text.innerHTML='';
+    document.getElementById("text").value ='';
+    }
+
+</script>
+</body>
+</html>
